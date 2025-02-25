@@ -1,18 +1,48 @@
 pipeline {
     agent any
+    parameters {
+        string(name: 'BRANCH_NAME', defaultValue: 'declarative', description: 'Rama a compilar')
+    }
+    options {
+        skipStagesAfterUnstable()
+    }
     stages {
-        stage('Build') {
+        stage('Checkout') {
             steps {
-                sh 'mvn -B -DskipTests clean package'
+                script {
+                    def repoDir = 'mi-proyecto'
+                    if (fileExists(repoDir)) {
+                        echo "Eliminando carpeta existente: ${repoDir}"
+                        sh "rm -rf ${repoDir}"
+                    }
+                    echo "Clonando la rama ${params.BRANCH_NAME}"
+                    sh "git clone --branch ${params.BRANCH_NAME} https://github.com/usuario/repositorio.git ${repoDir}"
+                }
             }
         }
-        stage('Test') { 
+        stage('Build') {
             steps {
-                sh 'mvn test' 
+                dir('mi-proyecto') {
+                    sh 'mvn -B -DskipTests clean package'
+                }
+            }
+        }
+        stage('Test') {
+            steps {
+                dir('mi-proyecto') {
+                    sh 'mvn test'
+                }
             }
             post {
                 always {
-                    junit 'target/surefire-reports/*.xml' 
+                    junit 'mi-proyecto/target/surefire-reports/*.xml'
+                }
+            }
+        }
+        stage('Deliver') { 
+            steps {
+                dir('mi-proyecto') {
+                    sh './jenkins/scripts/deliver.sh'
                 }
             }
         }
